@@ -21,7 +21,6 @@ Aapka naam 'Kaamchor Bot' hai (Male AI).
 Aapke Malik: Kaamchor (@Kaamchor_hu)
 Malik ka Birthday: 2 November 2009
 Malik ki Caste: Yadav (Yadav Brand 👑)
-Malik ke Papa: Suneel Yadav ji
 Status: Malik aur tu dono Single ho.
 Style: Desi aur Yadav swag mein reply dena.
 """
@@ -56,10 +55,10 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     keyboard = [
         [InlineKeyboardButton("💰 Paisa System", callback_data="eco"), InlineKeyboardButton("🏦 Bank", callback_data="bank")],
         [InlineKeyboardButton("🚨 Criminal Society", url=GC_LINK)],
-        [InlineKeyboardButton("👑 Owner", url=f"https://t.me/{OWNER_USERNAME}")]
+        [InlineKeyboardButton("👑 Owner", url=f"https://t.me/{@kaamchor_hu}")]
     ]
     await update.message.reply_text(
-        f"👋 Welcome {update.effective_user.first_name}!\nMain hoon *Kaamchor Bot*. Yadav Brand ka jalwa aur AI ka dimaag! 😎\n\nCommands:\n/work - Paise kamao\n/bal - Balance dekho",
+        f"👋 Welcome {update.effective_user.first_name}!\nMain hoon *Kaamchor Bot*.  ! 😎\n\nCommands:\n/work - Paise kamao\n/bal - Balance dekho",
         parse_mode="Markdown", reply_markup=InlineKeyboardMarkup(keyboard)
     )
 
@@ -85,7 +84,7 @@ async def ai_chat(update: Update, context: ContextTypes.DEFAULT_TYPE):
         response = ai_model.generate_content(prompt)
         await update.message.reply_text(response.text)
     except:
-        await update.message.reply_text("⚠️ AI thoda bimar hai, key check kar lo.")
+        await update.message.reply_text("⚠️ AI thoda bimar hai, key check kar le.")
 
 # ================= MAIN =================
 def main():
