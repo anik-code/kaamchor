@@ -7,7 +7,7 @@ from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import ApplicationBuilder, CommandHandler, ContextTypes, CallbackQueryHandler
 
 # ================= CONFIG =================
-BOT_TOKEN = "YOUR_TOKEN_HERE"
+BOT_TOKEN = "8696804914:AAGV9OYGHfwVfDxgprDL7_cqMmBwhQvsMYo"
 ECONOMY_FILE = "economy.json"
 
 SHOP_ITEMS = {
