@@ -1,96 +1,139 @@
-import http.server
-import socketserver
-import threading
-import os
+import json, os, random, time, http.server, socketserver, threading
+import google.generativeai as genai
+from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
+from telegram.ext import ApplicationBuilder, CommandHandler, ContextTypes, MessageHandler, filters, CallbackQueryHandler
 
-# Render port error fix karne ke liye chhota server
+# ================= RENDER PORT FIX =================
 def run_dummy_server():
     port = int(os.environ.get("PORT", 10000))
-    handler = http.server.SimpleHTTPRequestHandler
-    with socketserver.TCPServer(("", port), handler) as httpd:
-        print(f"Dummy server running on port {port}")
+    with socketserver.TCPServer(("", port), http.server.SimpleHTTPRequestHandler) as httpd:
         httpd.serve_forever()
-
-# Isse alag se chalne do
 threading.Thread(target=run_dummy_server, daemon=True).start()
-import json
-import os
-import random
-import time
-from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
-from telegram.ext import ApplicationBuilder, CommandHandler, ContextTypes, CallbackQueryHandler
 
-# ================= CONFIG =================
+# ================= CONFIG & IDENTITY =================
 BOT_TOKEN = os.environ.get("TOKEN")
+OWNER_USERNAME = "Kaamchor_hu"
+ADMIN_ID = 6393529341  # Aapki ID (Logs se check kar lena)
+GC_LINK = "https://t.me/+5hMWodyI8z5hMTBl"
+
+# AI ko ye sab yaad rahega
+PERSONAL_INFO = """
+- Tera Naam: Kaamchor Bot (Male AI)
+- Tera Malik: Kaamchor (@Kaamchor_hu)
+- Malik ka Birthday: 2 November 2009
+- Malik ki Caste: Yadav (Yadav Brand 👑)
+- Malik ke Papa: Suneel Yadav ji
+- Status: Malik bhi Single hai aur tu (Bot) bhi Single hai.
+- Group: Criminal Society (Yahan ka tu king hai)
+"""
+
+genai.configure(api_key=os.environ.get("GEMINI_API_KEY"))
+ai_model = genai.GenerativeModel('gemini-pro')
 ECONOMY_FILE = "economy.json"
 
-SHOP_ITEMS = {
-    "vip": 500,
-    "shield": 300,
-    "boost": 200
-}
-
-# ================= DATA =================
+# ================= DATA FUNCTIONS =================
 def load_data():
     if os.path.exists(ECONOMY_FILE):
-        with open(ECONOMY_FILE, "r") as f:
-            return json.load(f)
+        try:
+            with open(ECONOMY_FILE, "r") as f: return json.load(f)
+        except: return {}
     return {}
 
 ECO = load_data()
-
 def save():
-    with open(ECONOMY_FILE, "w") as f:
-        json.dump(ECO, f, indent=4)
+    with open(ECONOMY_FILE, "w") as f: json.dump(ECO, f, indent=4)
 
 def get_user(uid):
     uid = str(uid)
     if uid not in ECO:
-        ECO[uid] = {
-            "wallet": 0,
-            "bank": 0,
-            "last_daily": 0,
-            "inventory": []
-        }
+        ECO[uid] = {"wallet": 0, "bank": 0, "last_daily": 0, "inventory": [], "is_banned": False, "warns": 0}
     return ECO[uid]
 
-# ================= RANK =================
-def get_rank(balance):
-    if balance >= 2000: return "👑 Boss Kaamchor"
-    elif balance >= 1000: return "💎 Ameer"
-    elif balance >= 500: return "🔥 Pro"
-    elif balance >= 200: return "🙂 Thoda Ameer"
-    else: return "🐣 Naya Kaamchor"
+# ================= ADMIN LOGIC =================
+async def ban(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if update.effective_user.id != ADMIN_ID: return
+    if not context.args: return
+    target = context.args[0]
+    get_user(target)["is_banned"] = True
+    save()
+    await update.message.reply_text(f"🚫 User {target} ko Banned kar diya!")
+
+async def warn(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if update.effective_user.id != ADMIN_ID: return
+    if not context.args: return
+    target = context.args[0]
+    u = get_user(target)
+    u["warns"] += 1
+    if u["warns"] >= 3: u["is_banned"] = True
+    save()
+    await update.message.reply_text(f"⚠️ Warning {u['warns']}/3 bhej di!")
 
 # ================= COMMANDS =================
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    user = get_user(update.effective_user.id)
+    if user["is_banned"]: return
+    
     keyboard = [
         [InlineKeyboardButton("💰 Paisa System", callback_data="eco"), InlineKeyboardButton("🏦 Bank", callback_data="bank")],
-        [InlineKeyboardButton("🛒 Dukaan", callback_data="shop"), InlineKeyboardButton("🏆 Top Kaamchor", callback_data="lb")]
+        [InlineKeyboardButton("🚨 Criminal Society", url=GC_LINK)],
+        [InlineKeyboardButton("👑 Owner", url=f"https://t.me/{OWNER_USERNAME}")]
     ]
     await update.message.reply_text(
-        "👋 Welcome to *KAAMCHOR BOT* 😎\nKaam kam, paisa zyada!\nButtons use karo 👇",
-        parse_mode="Markdown",
-        reply_markup=InlineKeyboardMarkup(keyboard)
+        f"👋 Welcome {update.effective_user.first_name}!\nMain hoon *Kaamchor Bot*. Yadav Brand ka jalwa aur AI ka dimaag! 😎",
+        parse_mode="Markdown", reply_markup=InlineKeyboardMarkup(keyboard)
     )
 
-async def balance(update: Update, context: ContextTypes.DEFAULT_TYPE):
+async def work(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = get_user(update.effective_user.id)
-    total = user["wallet"] + user["bank"]
-    rank = get_rank(total)
+    if user["is_banned"]: return
+    earn = random.randint(30, 100)
+    user["wallet"] += earn
+    save()
+    await update.message.reply_text(f"💼 Thoda kaam kiya aur {earn} coins kamaye! 😅")
 
-    await update.message.reply_text(
-        f"👤 {update.effective_user.first_name}\n"
-        f"💰 Wallet: {user['wallet']}\n"
-        f"🏦 Bank: {user['bank']}\n"
-        f"🎖 Rank: {rank}"
-    )
-
-async def daily(update: Update, context: ContextTypes.DEFAULT_TYPE):
+# ================= AI CHAT =================
+async def ai_chat(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = get_user(update.effective_user.id)
-    now = time.time()
+    if user["is_banned"] or not update.message.text: return
+    
+    try:
+        prompt = (
+            f"SYSTEM: Aap 'Kaamchor Bot' ho. Ek Desi Yadav boy ki tarah baat karo. "
+            f"Details: {PERSONAL_INFO}. "
+            f"Hamesha fun aur swag mein reply dena. User: {update.message.text}"
+        )
+        response = ai_model.generate_content(prompt)
+        await update.message.reply_text(response.text)
+    except: pass
 
-    if now - user["last_daily"] < 86400:
-        rem = int(86400 - (now - user["last_daily"]))
-        hours = rem // 3600
-        
+# ================= WELCOME SYSTEM =================
+async def welcome(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    for member in update.message.new_chat_members:
+        if member.id == context.bot.id: continue
+        keyboard = [[InlineKeyboardButton("🚨 Join Criminal Society", url=GC_LINK)]]
+        await update.message.reply_text(
+            f"🚀 Oye {member.first_name}! Swagat hai Criminal Society mein! 😎\nLink niche hai, jaldi join kar!",
+            reply_markup=InlineKeyboardMarkup(keyboard)
+        )
+
+# ================= MAIN =================
+def main():
+    app = ApplicationBuilder().token(BOT_TOKEN).build()
+    
+    app.add_handler(CommandHandler("start", start))
+    app.add_handler(CommandHandler("work", work))
+    app.add_handler(CommandHandler("ban", ban))
+    app.add_handler(CommandHandler("warn", warn))
+    
+    # Welcome Handler
+    app.add_handler(MessageHandler(filters.StatusUpdate.NEW_CHAT_MEMBERS, welcome))
+    
+    # AI Chat Handler
+    app.add_handler(MessageHandler(filters.TEXT & (~filters.COMMAND), ai_chat))
+    
+    print("🔥 SAB KUCH ACTIVE HAI! 😎")
+    app.run_polling()
+
+if __name__ == "__main__":
+    main()
+    
