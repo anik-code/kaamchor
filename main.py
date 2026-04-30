@@ -21,7 +21,7 @@ from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import ApplicationBuilder, CommandHandler, ContextTypes, CallbackQueryHandler
 
 # ================= CONFIG =================
-BOT_TOKEN = "8725099835:AAEZWO84YNLfB5I3XaqRkllOP0uwA_fgqhs"
+BOT_TOKEN = os.environ.get("TOKEN")
 ECONOMY_FILE = "economy.json"
 
 SHOP_ITEMS = {
