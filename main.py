@@ -1,140 +1,118 @@
 import json, os, random, time, http.server, socketserver, threading
 import google.generativeai as genai
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
-from telegram.ext import ApplicationBuilder, CommandHandler, ContextTypes, MessageHandler, filters, CallbackQueryHandler
+from telegram.ext import ApplicationBuilder, CommandHandler, ContextTypes, MessageHandler, filters
 
-# ================= RENDER PORT FIX =================
-def run_dummy_server():
+# --- RENDER PORT FIX ---
+def run_dummy():
     port = int(os.environ.get("PORT", 10000))
-    with socketserver.TCPServer(("", port), http.server.SimpleHTTPRequestHandler) as httpd:
-        httpd.serve_forever()
-threading.Thread(target=run_dummy_server, daemon=True).start()
+    httpd = socketserver.TCPServer(("", port), http.server.SimpleHTTPRequestHandler)
+    httpd.serve_forever()
+threading.Thread(target=run_dummy, daemon=True).start()
 
-# ================= CONFIG & IDENTITY =================
-BOT_TOKEN = os.environ.get("TOKEN")
-OWNER_USERNAME = "Kaamchor_hu"
-ADMIN_ID = 6393529341  
-GC_LINK = "https://t.me/+5hMWodyI8z5hMTBl"
+# --- CONFIG ---
+TOKEN = os.environ.get("TOKEN")
+GEMINI_KEY = os.environ.get("GEMINI_API_KEY")
+GC_LINK = "https://t.me/+5hMWodyI8z5hMTBl" # Aapka Group Link
 
-# AI Instructions with your details
-PERSONAL_INFO = """
-Aapka naam 'Kaamchor Bot' hai (Male AI).
-Aapke Malik ki details:
-- Naam: Kaamchor (@Kaamchor_hu)
-- Birthday: 2 November 2009
-- Caste: Yadav (Yadav Brand 👑)
-- Papa ka Naam: Suneel Yadav ji
-- Status: Malik aur tu dono Single ho.
-- Group: Criminal Society ka tu King hai.
-Style: Hamesha Desi aur Yadav swag mein reply dena.
+# AI Identity
+IDENTITY = """
+Aapka naam Kaamchor Bot hai. Malik: @Kaamchor_hu (Yadav Brand).
+Details: DOB 2 Nov 2009, Papa: Suneel Yadav .
+Style: Hamesha Desi, haryanvi/hindi mix swag mein reply do. 
+Tu Criminal Society ka king hai aur ek number ka badmash bot hai.
 """
 
-genai.configure(api_key=os.environ.get("GEMINI_API_KEY"))
-ai_model = genai.GenerativeModel('gemini-pro')
-ECONOMY_FILE = "economy.json"
+if GEMINI_KEY:
+    genai.configure(api_key=GEMINI_KEY)
+    model = genai.GenerativeModel('gemini-pro')
 
-# ================= DATA FUNCTIONS =================
+# --- DATA SYSTEM ---
+ECO_FILE = "economy.json"
 def load_data():
-    if os.path.exists(ECONOMY_FILE):
+    if os.path.exists(ECO_FILE):
         try:
-            with open(ECONOMY_FILE, "r") as f: return json.load(f)
+            with open(ECO_FILE, "r") as f: return json.load(f)
         except: return {}
     return {}
 
 ECO = load_data()
 
 def save():
-    with open(ECONOMY_FILE, "w") as f: json.dump(ECO, f, indent=4)
+    with open(ECO_FILE, "w") as f: json.dump(ECO, f, indent=4)
 
 def get_user(uid):
     uid = str(uid)
     if uid not in ECO:
-        ECO[uid] = {"wallet": 0, "bank": 0, "last_daily": 0, "inventory": [], "is_banned": False, "warns": 0}
+        ECO[uid] = {"wallet": 100, "bank": 0, "last_work": 0}
     return ECO[uid]
 
-# ================= ADMIN LOGIC =================
-async def ban(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if update.effective_user.id != ADMIN_ID: return
-    if not context.args: return
-    target = context.args[0]
-    get_user(target)["is_banned"] = True
-    save()
-    await update.message.reply_text(f"🚫 User {target} ko Banned kar diya!")
+# --- COMMANDS ---
 
-async def warn(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if update.effective_user.id != ADMIN_ID: return
-    if not context.args: return
-    target = context.args[0]
-    u = get_user(target)
-    u["warns"] += 1
-    if u["warns"] >= 3: u["is_banned"] = True
-    save()
-    await update.message.reply_text(f"⚠️ Warning {u['warns']}/3 bhej di!")
-
-# ================= COMMANDS =================
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    user = get_user(update.effective_user.id)
-    if user["is_banned"]: return
-    
     keyboard = [
         [InlineKeyboardButton("💰 Paisa System", callback_data="eco"), InlineKeyboardButton("🏦 Bank", callback_data="bank")],
-        [InlineKeyboardButton("🚨 Criminal Society", url=GC_LINK)],
-        [InlineKeyboardButton("👑 Owner", url=f"https://t.me/{OWNER_USERNAME}")]
+        [InlineKeyboardButton("🚨 Join Criminal Society", url=GC_LINK)]
     ]
     await update.message.reply_text(
-        f"👋 Welcome {update.effective_user.first_name}!\nMain hoon *Kaamchor Bot*. Yadav Brand ka jalwa aur AI ka dimaag! 😎",
+        f"🔥 Oye {update.effective_user.first_name}!\n\nMain hoon **Kaamchor Bot**. !\n\n"
+        "👉 `/work` karke paise kamao.\n"
+        "👉 `/bal` se apna paisa dekho.\n"
+        "👉 Kuch bhi pucho, AI reply dega!",
         parse_mode="Markdown", reply_markup=InlineKeyboardMarkup(keyboard)
     )
 
+async def balance(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    u = get_user(update.effective_user.id)
+    await update.message.reply_text(f"💰 **Wallet:** {u['wallet']} coins\n🏦 **Bank:** {u['bank']} coins")
+
 async def work(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    user = get_user(update.effective_user.id)
-    if user["is_banned"]: return
-    earn = random.randint(30, 100)
-    user["wallet"] += earn
-    save()
-    await update.message.reply_text(f"💼 Thoda kaam kiya aur {earn} coins kamaye! 😅")
-
-# ================= AI CHAT =================
-async def ai_chat(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    user = get_user(update.effective_user.id)
-    if user["is_banned"] or not update.message.text: return
-    
-    try:
-        prompt = f"SYSTEM: {PERSONAL_INFO}\nUser: {update.message.text}"
-        response = ai_model.generate_content(prompt)
-        await update.message.reply_text(response.text)
-    except:
-        pass
-
-# ================= WELCOME SYSTEM =================
-async def welcome(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    for member in update.message.new_chat_members:
-        if member.id == context.bot.id: continue
-        keyboard = [[InlineKeyboardButton("🚨 Join Criminal Society", url=GC_LINK)]]
-        await update.message.reply_text(
-            f"🚀 Oye {member.first_name}! Swagat hai Criminal Society mein! 😎\nLink niche hai, jaldi join kar!",
-            reply_markup=InlineKeyboardMarkup(keyboard)
-        )
-
-# ================= MAIN =================
-def main():
-    if not BOT_TOKEN:
-        print("❌ Error: TOKEN environment variable nahi mila!")
+    u = get_user(update.effective_user.id)
+    now = time.time()
+    if now - u["last_work"] < 60:
+        await update.message.reply_text("🛑 Itna kaam mat kar thak jayega! 1 minute rukh ja.")
         return
-        
-    app = ApplicationBuilder().token(BOT_TOKEN).build()
     
+    earn = random.randint(50, 200)
+    u["wallet"] += earn
+    u["last_work"] = now
+    save()
+    jobs = ["Gadi saaf ki", "Yadav Brand ka parcha banta", "Badmashi ki", "Chai pilayi"]
+    await update.message.reply_text(f"✅ Tune **{random.choice(jobs)}** aur tujhe mile {earn} coins! 🔥")
+
+async def deposit(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    u = get_user(update.effective_user.id)
+    try:
+        amt = int(context.args[0])
+        if u["wallet"] >= amt:
+            u["wallet"] -= amt
+            u["bank"] += amt
+            save()
+            await update.message.reply_text(f"🏦 {amt} coins Bank mein jama kar diye!")
+        else: await update.message.reply_text("❌ Itne paise nahi hain tere paas!")
+    except: await update.message.reply_text("👉 `/dep [amount]` likho.")
+
+# --- AI CHAT ---
+async def ai_chat(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if not update.message.text: return
+    try:
+        prompt = f"{IDENTITY}\nUser: {update.message.text}"
+        res = model.generate_content(prompt)
+        await update.message.reply_text(res.text)
+    except: pass
+
+# --- MAIN ---
+def main():
+    app = ApplicationBuilder().token(TOKEN).build()
     app.add_handler(CommandHandler("start", start))
     app.add_handler(CommandHandler("work", work))
-    app.add_handler(CommandHandler("ban", ban))
-    app.add_handler(CommandHandler("warn", warn))
-    
-    app.add_handler(MessageHandler(filters.StatusUpdate.NEW_CHAT_MEMBERS, welcome))
+    app.add_handler(CommandHandler("bal", balance))
+    app.add_handler(CommandHandler("dep", deposit))
     app.add_handler(MessageHandler(filters.TEXT & (~filters.COMMAND), ai_chat))
     
-    print("🔥 KAAMCHOR BOT IS LIVE! 😎")
+    print("🚀 PRO KAAMCHOR BOT IS LIVE!")
     app.run_polling()
 
 if __name__ == "__main__":
     main()
-    
+            
