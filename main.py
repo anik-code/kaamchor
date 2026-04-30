@@ -1,3 +1,18 @@
+import http.server
+import socketserver
+import threading
+import os
+
+# Render port error fix karne ke liye chhota server
+def run_dummy_server():
+    port = int(os.environ.get("PORT", 10000))
+    handler = http.server.SimpleHTTPRequestHandler
+    with socketserver.TCPServer(("", port), handler) as httpd:
+        print(f"Dummy server running on port {port}")
+        httpd.serve_forever()
+
+# Isse alag se chalne do
+threading.Thread(target=run_dummy_server, daemon=True).start()
 import json
 import os
 import random
